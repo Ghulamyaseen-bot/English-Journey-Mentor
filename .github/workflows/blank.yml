@@ -1,4 +1,4 @@
-namen-interactive: Build English Journey APK
+name: Build English Journey APK
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup pnpm
@@ -19,7 +19,7 @@ jobs:
         with:
           version: 10
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -30,64 +30,31 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Extract project ZIP
+      - name: Extract ZIP
         run: |
-          ZIP_FILE=$(find . -maxdepth 2 -type f -name "*.zip" | head -n 1)
-
-          if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: Project ZIP file not found."
-            exit 1
-          fi
-
-          echo "Found ZIP: $ZIP_FILE"
-
-          mkdir -p extracted
-          unzip -q "$ZIP_FILE" -d extracted
-
-          echo "Extracted files:"
-          find extracted -maxdepth 4 -type f | head -100
+          ZIP=$(find . -type f -name "*.zip" | head -1)
+          mkdir -p project
+          unzip -q "$ZIP" -d project
 
       - name: Find project
         run: |
-          PACKAGE=$(find extracted -type f -name "package.json" | head -n 1)
+          P=$(find project -name package.json -not -path "*/node_modules/*" | head -1)
+          echo "ROOT=$(dirname "$P")" >> "$GITHUB_ENV"
 
-          if [ -z "$PACKAGE" ]; then
-            echo "ERROR: package.json not found."
-            exit 1
-          fi
+      - name: Install
+        run: cd "$ROOT" && pnpm install --frozen-lockfile
 
-          PROJECT_ROOT=$(dirname "$PACKAGE")
-
-          echo "PROJECT_ROOT=$PROJECT_ROOT" >> "$GITHUB_ENV"
-          echo "Project found at: $PROJECT_ROOT"
-
-      - name: Install dependencies
+      - name: Find app
         run: |
-          cd "$PROJECT_ROOT"
-          pnpm install --frozen-lockfile
+          A=$(find project -path "*/artifacts/english-journey/package.json" | head -1)
+          echo "APP=$(dirname "$A")" >> "$GITHUB_ENV"
 
-      - name: Find English Journey app
+      - name: Create Android
+        run: cd "$APP" && CI=1 pnpm exec expo prebuild --platform android --no-install
+
+      - name: Build APK
         run: |
-          APP_PACKAGE=$(find extracted -type f -path "*/artifacts/english-journey/package.json" | head -n 1)
-
-          if [ -z "$APP_PACKAGE" ]; then
-            echo "ERROR: English Journey app not found."
-            find extracted -type f -name package.json
-            exit 1
-          fi
-
-          APP_DIR=$(dirname "$APP_PACKAGE")
-
-          echo "APP_DIR=$APP_DIR" >> "$GITHUB_ENV"
-          echo "English Journey app: $APP_DIR"
-
- - name: Generate Android project
-  run: |
-    cd "$APP_DIR"
-    CI=1 pnpm exec expo prebuild --platform android
-      - name: Build Release APK
-        run: |
-          cd "$APP_DIR/android"
+          cd "$APP/android"
           chmod +x gradlew
           ./gradlew assembleRelease
 
@@ -95,5 +62,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: English-Journey-APK
-          path: extracted/**/artifacts/english-journey/android/app/build/outputs/apk/release/*.apk
-          if-no-files-found: error
+          path: project/**/artifacts/english-journey/android/app/build/outputs/apk/release/*.apk
