@@ -1,4 +1,4 @@
-name: Build English Journey APK
+namen-interactive: Build English Journey APK
 
 on:
   workflow_dispatch:
@@ -81,11 +81,10 @@ jobs:
           echo "APP_DIR=$APP_DIR" >> "$GITHUB_ENV"
           echo "English Journey app: $APP_DIR"
 
-      - name: Generate Android project
-        run: |
-          cd "$APP_DIR"
-          pnpm exec expo prebuild --platform android --non-interactive
-
+ - name: Generate Android project
+  run: |
+    cd "$APP_DIR"
+    CI=1 pnpm exec expo prebuild --platform android
       - name: Build Release APK
         run: |
           cd "$APP_DIR/android"
